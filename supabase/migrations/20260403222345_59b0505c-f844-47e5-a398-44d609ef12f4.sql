@@ -1,0 +1,1 @@
+ALTER TABLE public.clinics ADD COLUMN num_operating_rooms integer NOT NULL DEFAULT 4;

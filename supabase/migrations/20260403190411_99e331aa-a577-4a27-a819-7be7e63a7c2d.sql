@@ -1,0 +1,1 @@
+CREATE POLICY "Coordinador can delete surgeries" ON public.surgeries FOR DELETE TO authenticated USING (has_role(auth.uid(), 'coordinador'::app_role));

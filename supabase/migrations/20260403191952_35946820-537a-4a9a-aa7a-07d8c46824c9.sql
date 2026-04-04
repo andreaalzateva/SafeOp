@@ -1,0 +1,1 @@
+ALTER TABLE public.surgeries ADD COLUMN IF NOT EXISTS patient_id TEXT;
