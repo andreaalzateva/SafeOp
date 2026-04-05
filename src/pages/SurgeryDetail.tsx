@@ -38,7 +38,7 @@ export default function SurgeryDetail() {
   });
 
   const [editForm, setEditForm] = useState({
-    patient: '', patient_id: '', procedure_name: '', room: '', date: '', time: '',
+    patient: '', patient_id: '', patient_weight: '', procedure_name: '', room: '', date: '', time: '',
     surgeon: '', anesthesiologist: '', checklist_owner: '',
   });
 
@@ -128,6 +128,7 @@ export default function SurgeryDetail() {
     setEditForm({
       patient: surgery.patient,
       patient_id: (surgery as any).patient_id || '',
+      patient_weight: (surgery as any).patient_weight ? String((surgery as any).patient_weight) : '',
       procedure_name: surgery.procedure_name,
       room: surgery.room,
       date: surgery.date,
@@ -144,6 +145,7 @@ export default function SurgeryDetail() {
     const { error } = await supabase.from('surgeries').update({
       patient: editForm.patient,
       patient_id: editForm.patient_id || null,
+      patient_weight: editForm.patient_weight ? parseFloat(editForm.patient_weight) : null,
       procedure_name: editForm.procedure_name,
       room: editForm.room,
       date: editForm.date,
@@ -250,6 +252,10 @@ export default function SurgeryDetail() {
               <div>
                 <Label>Identificación</Label>
                 <Input className="mt-1.5" placeholder="Cédula o ID" value={editForm.patient_id} onChange={e => setEditForm({ ...editForm, patient_id: e.target.value })} />
+              </div>
+              <div>
+                <Label>Peso del Paciente (kg)</Label>
+                <Input className="mt-1.5" type="number" step="0.1" min="0" placeholder="Ej: 72.5" value={editForm.patient_weight} onChange={e => setEditForm({ ...editForm, patient_weight: e.target.value })} />
               </div>
               <div className="sm:col-span-2">
                 <Label>Procedimiento</Label>

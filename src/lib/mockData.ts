@@ -9,6 +9,7 @@ export interface ChecklistQuestion {
   followUpText?: string;
   followUpAnswer?: 'si' | 'no' | null;
   followUpOnYes?: boolean;
+  followUpBlockAnswer?: 'si' | 'no';
   blockOnNo?: boolean;
 }
 
@@ -114,12 +115,12 @@ export const signInQuestions: Omit<ChecklistQuestion, 'answer' | 'answeredBy' | 
   { id: 'si2', text: '¿Se ha marcado el sitio quirúrgico? (Sí / No procede)', blockOnNo: true },
   { id: 'si3', text: '¿Se ha completado la comprobación de los aparatos de anestesia y la medicación anestésica?', blockOnNo: true },
   { id: 'si4', text: '¿Se ha colocado el pulsioxímetro al paciente y funciona?', blockOnNo: true },
-  { id: 'si_uci', text: '¿Se ha confirmado la disponibilidad de cama en UCI?', followUpText: '¿Es necesaria la cama de UCI para este paciente?' },
+  { id: 'si_uci', text: '¿Se ha confirmado la disponibilidad de cama en UCI?', followUpText: '¿Es necesaria la cama de UCI para este paciente?', followUpBlockAnswer: 'si' },
   { id: 'si_equipo', text: '¿El equipo quirúrgico está listo y esterilizado?', blockOnNo: true },
   { id: 'si_meds', text: '¿Los medicamentos están anotados, listos y completos?', blockOnNo: true },
-  { id: 'si5', text: '¿Tiene el paciente alergias conocidas?', followUpText: '¿Son conocidas y tenidas en cuenta?', followUpOnYes: true },
-  { id: 'si6', text: '¿Tiene el paciente vía aérea difícil / riesgo de aspiración?', followUpText: '¿Hay materiales, equipos y ayuda disponible?', followUpOnYes: true },
-  { id: 'si7', text: '¿Tiene el paciente riesgo de hemorragia >500 ml (7 ml/kg en niños)?', followUpText: '¿Se ha previsto la disponibilidad de líquidos y dos vías IV o centrales?', followUpOnYes: true },
+  { id: 'si5', text: '¿Tiene el paciente alergias conocidas?', followUpText: '¿Son conocidas y tenidas en cuenta?', followUpOnYes: true, followUpBlockAnswer: 'no' },
+  { id: 'si6', text: '¿Tiene el paciente vía aérea difícil / riesgo de aspiración?', followUpText: '¿Hay materiales, equipos y ayuda disponible?', followUpOnYes: true, followUpBlockAnswer: 'no' },
+  { id: 'si7', text: '¿Tiene el paciente riesgo de hemorragia >500 ml (7 ml/kg en niños)?', followUpText: '¿Se ha previsto la disponibilidad de líquidos y dos vías IV o centrales?', followUpOnYes: true, followUpBlockAnswer: 'no' },
 ];
 
 // WHO Surgical Safety Checklist — Time Out (Before skin incision)

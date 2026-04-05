@@ -80,17 +80,38 @@ export default function Checklist() {
     return <Layout><p className="text-muted-foreground">Cirugía no encontrada.</p></Layout>;
   }
 
+  const today = new Date().toISOString().split('T')[0];
+  if (surgery.date !== today) {
+    return (
+      <Layout>
+        <div className="mx-auto max-w-lg mt-12 text-center rounded-xl border bg-card p-8">
+          <p className="text-lg font-semibold text-foreground mb-2">Checklist no disponible</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            Solo se puede realizar el checklist el mismo día en que la cirugía está programada.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Fecha programada: <span className="font-medium text-foreground">{new Date(surgery.date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+          </p>
+          <Button className="mt-6" onClick={() => navigate('/dashboard')}>Volver al Dashboard</Button>
+        </div>
+      </Layout>
+    );
+  }
+
   const noBlockingAnswers = (questions: ChecklistQuestion[]) =>
     questions.every((q) => !(q.blockOnNo && q.answer === 'no'));
 
   const allSignInAnswered = signInAnswers.every((q) => q.answer !== null);
-  const signInFollowUpsOk = signInAnswers.every((q) => {
+  const followUpsOk = (questions: ChecklistQuestion[]) => questions.every((q) => {
     const trigger = q.followUpOnYes ? 'si' : 'no';
     if (q.followUpText && q.answer === trigger) {
-      return q.followUpAnswer !== null;
+      if (q.followUpAnswer === null) return false;
+      if (q.followUpBlockAnswer != null && q.followUpAnswer === q.followUpBlockAnswer) return false;
+      return true;
     }
     return true;
   });
+  const signInFollowUpsOk = followUpsOk(signInAnswers);
   const allTimeOutAnswered = timeOutAnswers.every((q) => q.answer !== null);
   const usedInstruments = instruments.filter((i) => i.initialCount > 0);
   const allSignOutAnswered = signOutAnswers.every((q) => q.answer !== null);
