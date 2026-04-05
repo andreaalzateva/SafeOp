@@ -34,30 +34,29 @@ export default function AdminClinics() {
     },
   });
 
-  const getToken = async () => {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token;
-  };
-
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const token = await getToken();
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-clinic?action=create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ ...form, num_operating_rooms: parseInt(form.num_operating_rooms) || 4 }),
-    });
-    const result = await res.json();
-    if (result.success) {
+
+    try {
+      const { error } = await supabase.from('clinics').insert({
+        name: form.name,
+        nit: form.nit,
+        address: form.address,
+        num_operating_rooms: parseInt(form.num_operating_rooms) || 4,
+      });
+
+      if (error) throw error;
+
       toast.success(`Clínica "${form.name}" creada`);
       setForm({ name: '', nit: '', address: '', num_operating_rooms: '4' });
       setShowForm(false);
       queryClient.invalidateQueries({ queryKey: ['clinics'] });
-    } else {
-      toast.error(result.error || 'Error al crear clínica');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al crear clínica');
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const startEdit = (c: typeof clinics[0]) => {
@@ -68,39 +67,45 @@ export default function AdminClinics() {
   const handleUpdate = async () => {
     if (!editingId) return;
     setSavingEdit(true);
-    const token = await getToken();
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-clinic?action=update`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ clinicId: editingId, ...editForm, num_operating_rooms: parseInt(editForm.num_operating_rooms) || 4 }),
-    });
-    const result = await res.json();
-    if (result.success) {
+
+    try {
+      const { error } = await supabase
+        .from('clinics')
+        .update({
+          name: editForm.name,
+          nit: editForm.nit,
+          address: editForm.address,
+          num_operating_rooms: parseInt(editForm.num_operating_rooms) || 4,
+        })
+        .eq('id', editingId);
+
+      if (error) throw error;
+
       toast.success('Clínica actualizada');
       setEditingId(null);
       queryClient.invalidateQueries({ queryKey: ['clinics'] });
-    } else {
-      toast.error(result.error || 'Error al actualizar');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al actualizar');
+    } finally {
+      setSavingEdit(false);
     }
-    setSavingEdit(false);
   };
 
   const handleDelete = async (clinicId: string) => {
     setDeletingId(clinicId);
-    const token = await getToken();
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-clinic?action=delete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ clinicId }),
-    });
-    const result = await res.json();
-    if (result.success) {
+
+    try {
+      const { error } = await supabase.from('clinics').delete().eq('id', clinicId);
+
+      if (error) throw error;
+
       toast.success('Clínica eliminada');
       queryClient.invalidateQueries({ queryKey: ['clinics'] });
-    } else {
-      toast.error(result.error || 'Error al eliminar');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar');
+    } finally {
+      setDeletingId(null);
     }
-    setDeletingId(null);
   };
 
   if (!user?.isSuperAdmin) {

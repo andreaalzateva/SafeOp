@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchableSelect from '@/components/SearchableSelect';
-import { ArrowLeft, CheckCircle2, XCircle, Clock, User, MapPin, Shield, Wrench, Loader2, Pencil, Trash2, Save, X } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, XCircle, Clock, User, MapPin, Shield, Wrench, Loader2, Pencil, Trash2, Save, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
@@ -302,8 +302,12 @@ export default function SurgeryDetail() {
 
         <div className="mb-6 rounded-xl border bg-card p-4">
           <div className="flex flex-wrap gap-4 text-sm">
-            <span className="flex items-center gap-1 text-muted-foreground"><MapPin className="h-3.5 w-3.5" />{surgery.room}</span>
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <Calendar className="h-3.5 w-3.5" />
+              {new Date(surgery.date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </span>
             <span className="flex items-center gap-1 text-muted-foreground"><Clock className="h-3.5 w-3.5" />{surgery.time}</span>
+            <span className="flex items-center gap-1 text-muted-foreground"><MapPin className="h-3.5 w-3.5" />{surgery.room}</span>
             <span className="flex items-center gap-1 text-muted-foreground"><User className="h-3.5 w-3.5" />{surgery.surgeon}</span>
           </div>
         </div>

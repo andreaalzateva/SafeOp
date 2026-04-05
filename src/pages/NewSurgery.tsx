@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchableSelect from '@/components/SearchableSelect';
+import { commonProcedures } from '@/lib/mockData';
 import { toast } from 'sonner';
 import { ArrowLeft, Save } from 'lucide-react';
 
@@ -17,8 +18,11 @@ export default function NewSurgery() {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
-    patient: '', patientId: '', procedure: '', room: '', date: '', time: '', surgeon: '', anesthesiologist: '', checklistOwner: '',
+    patient: '', patientId: '', patientWeight: '', procedure: '', room: '', date: '', time: '', surgeon: '', anesthesiologist: '', checklistOwner: '',
   });
+
+  // Get today's date in YYYY-MM-DD format for min attribute
+  const today = new Date().toISOString().split('T')[0];
 
   const { data: consultaUsers = [] } = useQuery({
     queryKey: ['consulta-users', user?.clinicId],
@@ -64,10 +68,20 @@ export default function NewSurgery() {
       toast.error('Selecciona un cirujano y un anestesiólogo');
       return;
     }
+    const idDigits = form.patientId.replace(/\D/g, '');
+    if (idDigits.length < 7 || idDigits.length > 10) {
+      toast.error('La cédula debe tener entre 7 y 10 dígitos');
+      return;
+    }
+    if (form.date < today) {
+      toast.error('No se puede programar una cirugía en una fecha pasada');
+      return;
+    }
     setSubmitting(true);
     const { error } = await supabase.from('surgeries').insert({
       patient: form.patient,
       patient_id: form.patientId || null,
+      patient_weight: form.patientWeight ? parseFloat(form.patientWeight) : null,
       procedure_name: form.procedure,
       room: form.room,
       date: form.date,
@@ -108,11 +122,22 @@ export default function NewSurgery() {
             </div>
             <div>
               <Label>Identificación del Paciente</Label>
-              <Input className="mt-1.5" placeholder="Cédula o ID" value={form.patientId} onChange={(e) => setForm({ ...form, patientId: e.target.value })} required />
+              <Input className="mt-1.5" placeholder="Cédula (7-10 dígitos)" value={form.patientId} onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 10); setForm({ ...form, patientId: v }); }} required minLength={7} maxLength={10} inputMode="numeric" pattern="\d{7,10}" />
+            </div>
+            <div>
+              <Label>Peso del Paciente (kg)</Label>
+              <Input className="mt-1.5" type="number" step="0.1" min="0" placeholder="Ej: 72.5" value={form.patientWeight} onChange={(e) => setForm({ ...form, patientWeight: e.target.value })} required />
             </div>
             <div className="sm:col-span-2">
               <Label>Procedimiento</Label>
-              <Input className="mt-1.5" placeholder="Tipo de cirugía" value={form.procedure} onChange={(e) => setForm({ ...form, procedure: e.target.value })} required />
+              <div className="mt-1.5">
+                <SearchableSelect
+                  options={commonProcedures}
+                  value={form.procedure}
+                  onChange={(v) => setForm({ ...form, procedure: v })}
+                  placeholder="Buscar o escribir procedimiento..."
+                />
+              </div>
             </div>
             <div>
               <Label>Sala / Quirófano</Label>
@@ -127,7 +152,7 @@ export default function NewSurgery() {
             </div>
             <div>
               <Label>Fecha</Label>
-              <Input className="mt-1.5" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+              <Input className="mt-1.5" type="date" min={today} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             </div>
             <div>
               <Label>Hora</Label>

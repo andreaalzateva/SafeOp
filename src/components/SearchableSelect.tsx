@@ -34,7 +34,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
         <Input
           placeholder={placeholder}
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+          onChange={(e) => { setSearch(e.target.value); onChange(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           className="pr-8"
         />

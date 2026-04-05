@@ -1,11 +1,19 @@
+import { useState } from 'react';
 import { useAuth } from '@/lib/authContext';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, MapPin, User, ArrowRight, AlertTriangle, CheckCircle2, Activity, Eye, Loader2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, ArrowRight, AlertTriangle, CheckCircle2, Activity, Eye, Loader2, Search, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+function formatFullDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   programada: { label: 'Programada', color: 'bg-secondary text-secondary-foreground' },
@@ -18,6 +26,8 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const { data: surgeries = [], isLoading } = useQuery({
     queryKey: ['surgeries', user?.clinicId],
@@ -45,6 +55,17 @@ export default function Dashboard() {
         { label: 'Alertas', value: 0, icon: AlertTriangle, color: 'text-destructive' },
       ]
     : null;
+
+  const filtered = surgeries.filter((s) => {
+    const matchesSearch =
+      !searchTerm ||
+      s.patient.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.procedure_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.surgeon.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.room && s.room.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   if (isLoading) {
     return (
@@ -84,13 +105,44 @@ export default function Dashboard() {
         </div>
       )}
 
-      {surgeries.length === 0 ? (
+      {/* Filters */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por paciente, procedimiento, cirujano o sala..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="programada">Programada</SelectItem>
+              <SelectItem value="sign-in">Sign In</SelectItem>
+              <SelectItem value="time-out">Time Out</SelectItem>
+              <SelectItem value="sign-out">Sign Out</SelectItem>
+              <SelectItem value="completada">Completada</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
         <div className="rounded-xl border bg-card p-8 text-center">
-          <p className="text-muted-foreground">No hay cirugías registradas aún.</p>
+          <p className="text-muted-foreground">
+            {searchTerm || statusFilter !== 'all' ? 'No se encontraron resultados con los filtros aplicados.' : 'No hay cirugías registradas aún.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {surgeries.map((surgery, i) => {
+          {filtered.map((surgery, i) => {
             const status = statusConfig[surgery.status] || statusConfig.programada;
             const canStartChecklist = user?.role === 'encargado' && surgery.status !== 'completada';
 
@@ -106,6 +158,7 @@ export default function Dashboard() {
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">{surgery.procedure_name}</p>
                     <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{formatFullDate(surgery.date)}</span>
                       <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{surgery.time}</span>
                       <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{surgery.room}</span>
                       <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{surgery.surgeon}</span>

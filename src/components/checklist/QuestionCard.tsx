@@ -12,8 +12,9 @@ interface Props {
 
 export default function QuestionCard({ question, onAnswer, onFollowUpAnswer, index }: Props) {
   const hasFollowUp = !!question.followUpText;
-  const showFollowUp = hasFollowUp && question.answer === 'si';
-  const followUpBlocked = showFollowUp && question.followUpAnswer === 'no';
+  const followUpTrigger = question.followUpOnYes ? 'si' : 'no';
+  const showFollowUp = hasFollowUp && question.answer === followUpTrigger;
+  const followUpBlocked = false;
   const blockingNo = question.blockOnNo && question.answer === 'no';
 
   return (
@@ -86,7 +87,7 @@ export default function QuestionCard({ question, onAnswer, onFollowUpAnswer, ind
               size="sm"
               variant={question.followUpAnswer === 'no' ? 'default' : 'outline'}
               onClick={() => onFollowUpAnswer?.(question.id, 'no')}
-              className={`gap-1.5 ${question.followUpAnswer === 'no' ? 'bg-destructive hover:bg-destructive/90 text-white' : ''}`}
+              className={`gap-1.5 ${question.followUpAnswer === 'no' ? 'bg-warning hover:bg-warning/90 text-white' : ''}`}
             >
               <XCircle className="h-4 w-4" /> No
             </Button>

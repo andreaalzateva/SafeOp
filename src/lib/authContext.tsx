@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 
 export type UserRole = 'supervisor' | 'coordinador' | 'encargado' | 'consulta';
 
@@ -57,6 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) { setLoading(false); return; }
+
     let mounted = true;
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -81,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string, role: UserRole): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured) return { success: false, error: 'Backend no configurado. Conecta Supabase para habilitar la autenticación.' };
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { success: false, error: 'Correo o contraseña incorrectos.' };
 
