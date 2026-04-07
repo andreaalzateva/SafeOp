@@ -76,7 +76,7 @@ SafeOp fue desarrollado como un MVP funcional, priorizando:
 ## 🌐 Acceso
 
 La aplicación se encuentra desplegada y disponible en línea para su evaluación.
-
+https://safe-op.vercel.app/
 ---
 
 Este proyecto fue desarrollado en el contexto de una hackathon, con el objetivo de proponer una solución real, funcional y escalable para mejorar la seguridad en procedimientos quirúrgicos.
