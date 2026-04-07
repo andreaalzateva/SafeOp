@@ -12,6 +12,7 @@ import SearchableSelect from '@/components/SearchableSelect';
 import { commonProcedures } from '@/lib/mockData';
 import { toast } from 'sonner';
 import { ArrowLeft, Save } from 'lucide-react';
+import { getLocalToday } from '@/lib/utils';
 
 export default function NewSurgery() {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ export default function NewSurgery() {
   });
 
   // Get today's date in YYYY-MM-DD format for min attribute
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalToday();
 
   const { data: consultaUsers = [] } = useQuery({
     queryKey: ['consulta-users', user?.clinicId],
@@ -76,6 +77,16 @@ export default function NewSurgery() {
     if (form.date < today) {
       toast.error('No se puede programar una cirugía en una fecha pasada');
       return;
+    }
+    if (form.date === today && form.time) {
+      const now = new Date();
+      const [h, m] = form.time.split(':').map(Number);
+      const selected = new Date();
+      selected.setHours(h, m, 0, 0);
+      if (selected <= now) {
+        toast.error('La hora seleccionada ya pasó. Elige una hora futura.');
+        return;
+      }
     }
     setSubmitting(true);
     const { error } = await supabase.from('surgeries').insert({

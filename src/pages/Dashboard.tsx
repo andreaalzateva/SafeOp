@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { statusConfig, getStatusConfig } from '@/lib/surgeryStatus';
+import { getLocalToday } from '@/lib/utils';
+import { signInQuestions, timeOutQuestions, signOutQuestions } from '@/lib/mockData';
 
 function formatFullDate(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -40,32 +42,50 @@ export default function Dashboard() {
     staleTime: 0,
   });
 
-  // Count surgeries with "no" answers (alerts) for coordinator dashboard
+  // Build sets of question IDs that represent true alerts (blocking "no" answers)
+  const blockOnNoIds = new Set(
+    [...signInQuestions, ...timeOutQuestions, ...signOutQuestions]
+      .filter(q => q.blockOnNo)
+      .map(q => q.id)
+  );
+  const followUpBlockMap = new Map(
+    [...signInQuestions, ...timeOutQuestions, ...signOutQuestions]
+      .filter(q => q.followUpText && q.followUpBlockAnswer)
+      .map(q => [q.id + '-followup', q.followUpBlockAnswer!])
+  );
+
+  // Count surgeries with truly invalid "no" answers (alerts) for coordinator dashboard
   const { data: alertCount = 0 } = useQuery({
     queryKey: ['surgery-alerts', user?.clinicId],
     queryFn: async () => {
-      // Get surgery IDs for this clinic
       const surgeryIds = surgeries.map(s => s.id);
       if (surgeryIds.length === 0) return 0;
 
-      // Get phases for these surgeries
-      const { data: phases, error: pErr } = await supabase
+      const { data: phases } = await supabase
         .from('checklist_phases')
         .select('id, surgery_id')
         .in('surgery_id', surgeryIds);
-      if (pErr || !phases || phases.length === 0) return 0;
+      if (!phases || phases.length === 0) return 0;
 
-      // Get answers with "no" for these phases
-      const { data: noAnswers, error: aErr } = await supabase
+      const { data: answers } = await supabase
         .from('checklist_answers')
-        .select('phase_id')
-        .in('phase_id', phases.map(p => p.id))
-        .eq('answer', 'no');
-      if (aErr || !noAnswers) return 0;
+        .select('phase_id, question_id, answer')
+        .in('phase_id', phases.map(p => p.id));
+      if (!answers) return 0;
 
-      // Count unique surgeries with at least one "no"
       const phaseToSurgery = new Map(phases.map(p => [p.id, p.surgery_id]));
-      const surgeriesWithAlerts = new Set(noAnswers.map(a => phaseToSurgery.get(a.phase_id)));
+      const surgeriesWithAlerts = new Set<string>();
+
+      for (const a of answers) {
+        if (!a.answer) continue;
+        const isBlockingNo = a.answer === 'no' && blockOnNoIds.has(a.question_id);
+        const followUpBlock = followUpBlockMap.get(a.question_id);
+        const isBlockingFollowUp = followUpBlock !== undefined && a.answer === followUpBlock;
+        if (isBlockingNo || isBlockingFollowUp) {
+          const surgeryId = phaseToSurgery.get(a.phase_id);
+          if (surgeryId) surgeriesWithAlerts.add(surgeryId);
+        }
+      }
       return surgeriesWithAlerts.size;
     },
     enabled: isCoordinator && surgeries.length > 0,
@@ -73,7 +93,7 @@ export default function Dashboard() {
     staleTime: 0,
   });
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalToday();
   const isConsulta = user?.role === 'consulta';
 
   const stats = isCoordinator
@@ -216,3 +236,4 @@ export default function Dashboard() {
     </Layout>
   );
 }
+

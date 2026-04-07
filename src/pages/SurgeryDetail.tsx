@@ -12,6 +12,7 @@ import SearchableSelect from '@/components/SearchableSelect';
 import { ArrowLeft, Calendar, CheckCircle2, XCircle, Clock, User, MapPin, Shield, Wrench, Loader2, Pencil, Trash2, Save, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { getLocalToday } from '@/lib/utils';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -141,6 +142,21 @@ export default function SurgeryDetail() {
   };
 
   const handleSave = async () => {
+    const today = getLocalToday();
+    if (editForm.date < today) {
+      toast.error('No se puede programar una cirugía en una fecha pasada');
+      return;
+    }
+    if (editForm.date === today && editForm.time) {
+      const now = new Date();
+      const [h, m] = editForm.time.split(':').map(Number);
+      const selected = new Date();
+      selected.setHours(h, m, 0, 0);
+      if (selected <= now) {
+        toast.error('La hora seleccionada ya pasó. Elige una hora futura.');
+        return;
+      }
+    }
     setSaving(true);
     const { error } = await supabase.from('surgeries').update({
       patient: editForm.patient,

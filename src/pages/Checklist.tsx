@@ -14,6 +14,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle2, MapPin, Clock, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { getLocalToday } from '@/lib/utils';
 
 const moments = [
   { key: 'sign-in', label: 'Sign In', subtitle: 'Antes de la anestesia' },
@@ -259,7 +260,7 @@ export default function Checklist() {
     return <Layout><p className="text-muted-foreground">Cirugía no encontrada.</p></Layout>;
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalToday();
   if (surgery.date !== today) {
     return (
       <Layout>
