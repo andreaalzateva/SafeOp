@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/authContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
 import { signInQuestions, timeOutQuestions, signOutQuestions, commonInstruments } from '@/lib/mockData';
@@ -31,10 +31,39 @@ const statusToMoment: Record<string, number> = {
   'signature': 3,
 };
 
+/** Build answer rows from questions for DB insert */
+function buildAnswerRows(phaseId: string, questions: ChecklistQuestion[]) {
+  return questions
+    .filter(q => q.answer !== null)
+    .flatMap((q) => {
+      const rows = [{
+        phase_id: phaseId,
+        question_id: q.id,
+        question_text: q.text,
+        answer: q.answer || null,
+        answered_by: q.answeredBy || null,
+        answered_at: q.answeredAt ? new Date().toISOString() : null,
+      }];
+      const trigger = q.followUpOnYes ? 'si' : 'no';
+      if (q.followUpText && q.answer === trigger && q.followUpAnswer) {
+        rows.push({
+          phase_id: phaseId,
+          question_id: q.id + '-followup',
+          question_text: q.followUpText,
+          answer: q.followUpAnswer || null,
+          answered_by: q.answeredBy || null,
+          answered_at: q.answeredAt ? new Date().toISOString() : null,
+        });
+      }
+      return rows;
+    });
+}
+
 export default function Checklist() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: surgery, isLoading } = useQuery({
     queryKey: ['surgery', id],
@@ -45,11 +74,15 @@ export default function Checklist() {
     },
   });
 
-  // Load existing phases and answers for this surgery
+  // Load existing phases for this surgery
   const { data: existingPhases = [], isFetched: phasesFetched } = useQuery({
     queryKey: ['checklist-phases', id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('checklist_phases').select('*').eq('surgery_id', id!);
+      const { data, error } = await supabase
+        .from('checklist_phases')
+        .select('*')
+        .eq('surgery_id', id!)
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -98,6 +131,9 @@ export default function Checklist() {
   const [finalInstruments, setFinalInstruments] = useState<InstrumentCount[]>([]);
   const [saving, setSaving] = useState(false);
 
+  // Track phase IDs we've created/found so we can reuse them
+  const phaseIdCache = useRef<Record<string, string>>({});
+
   // Mark surgery as in-progress on entry
   useEffect(() => {
     if (!surgery || surgery.status !== 'programada') return;
@@ -121,6 +157,13 @@ export default function Checklist() {
     const comp = [false, false, false, false];
     for (let i = 0; i < momentIdx; i++) comp[i] = true;
     setCompleted(comp);
+
+    // Cache existing phase IDs for reuse
+    for (const p of existingPhases) {
+      if (!phaseIdCache.current[p.phase]) {
+        phaseIdCache.current[p.phase] = p.id;
+      }
+    }
 
     // Restore saved answers into the current phase's state
     if (existingAnswers.length > 0) {
@@ -184,57 +227,63 @@ export default function Checklist() {
     setRestored(true);
   }, [surgery, existingPhases, existingAnswers, existingInstruments, restored, phasesFetched, answersFetched]);
 
-  // Auto-save partial answers for the current phase
-  const autoSaveRef = useRef<NodeJS.Timeout | null>(null);
+  // Helper: get or create a phase row (idempotent via unique constraint)
+  const getOrCreatePhaseId = useCallback(async (phase: string): Promise<string | null> => {
+    // Check cache first
+    if (phaseIdCache.current[phase]) return phaseIdCache.current[phase];
+
+    // Try to find existing
+    const { data: existing } = await supabase
+      .from('checklist_phases')
+      .select('id')
+      .eq('surgery_id', id!)
+      .eq('phase', phase)
+      .maybeSingle();
+
+    if (existing) {
+      phaseIdCache.current[phase] = existing.id;
+      return existing.id;
+    }
+
+    // Create new
+    const { data: created, error } = await supabase
+      .from('checklist_phases')
+      .insert({ surgery_id: id!, phase, completed_by: user?.id })
+      .select('id')
+      .single();
+
+    if (error || !created) return null;
+    phaseIdCache.current[phase] = created.id;
+    return created.id;
+  }, [id, user]);
+
+  // Track last saved hash to avoid redundant saves
+  const lastSavedHash = useRef<string>('');
+
+  // Auto-save: upsert answers for the current phase
   const autoSavePhase = useCallback(async (phase: string, questions: ChecklistQuestion[]) => {
     const answeredQuestions = questions.filter(q => q.answer !== null);
     if (answeredQuestions.length === 0) return;
 
-    // Upsert: delete existing partial phase, then re-insert
-    const existingPhase = existingPhases.find(p => p.phase === phase);
-    let phaseId: string;
-    if (existingPhase) {
-      phaseId = existingPhase.id;
-      // Delete old answers for this phase
-      await supabase.from('checklist_answers').delete().eq('phase_id', phaseId);
-    } else {
-      const { data: phaseRow, error } = await supabase.from('checklist_phases').insert({
-        surgery_id: id!,
-        phase,
-        completed_by: user?.id,
-      }).select('id').single();
-      if (error || !phaseRow) return;
-      phaseId = phaseRow.id;
+    // Simple hash to skip redundant saves
+    const hash = answeredQuestions.map(q => `${q.id}:${q.answer}:${q.followUpAnswer}`).join('|');
+    if (hash === lastSavedHash.current) return;
+
+    const phaseId = await getOrCreatePhaseId(phase);
+    if (!phaseId) return;
+
+    // Delete old answers, then insert fresh ones
+    await supabase.from('checklist_answers').delete().eq('phase_id', phaseId);
+    const rows = buildAnswerRows(phaseId, questions);
+    if (rows.length > 0) {
+      await supabase.from('checklist_answers').insert(rows);
     }
 
-    const answers = answeredQuestions.flatMap((q) => {
-      const rows = [{
-        phase_id: phaseId,
-        question_id: q.id,
-        question_text: q.text,
-        answer: q.answer || null,
-        answered_by: q.answeredBy || null,
-        answered_at: q.answeredAt ? new Date().toISOString() : null,
-      }];
-      const trigger = q.followUpOnYes ? 'si' : 'no';
-      if (q.followUpText && q.answer === trigger && q.followUpAnswer) {
-        rows.push({
-          phase_id: phaseId,
-          question_id: q.id + '-followup',
-          question_text: q.followUpText,
-          answer: q.followUpAnswer || null,
-          answered_by: q.answeredBy || null,
-          answered_at: q.answeredAt ? new Date().toISOString() : null,
-        });
-      }
-      return rows;
-    });
-    if (answers.length > 0) {
-      await supabase.from('checklist_answers').insert(answers);
-    }
-  }, [id, user, existingPhases]);
+    lastSavedHash.current = hash;
+  }, [getOrCreatePhaseId]);
 
-  // Debounced auto-save when answers change
+  // Debounced auto-save (reduced to 800ms)
+  const autoSaveRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
     if (!restored || !id) return;
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
@@ -248,9 +297,29 @@ export default function Checklist() {
       if (answersMap[phaseKey]) {
         autoSavePhase(phaseKey, answersMap[phaseKey]);
       }
-    }, 2000);
+    }, 800);
     return () => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); };
   }, [signInAnswers, timeOutAnswers, signOutAnswers, currentMoment, restored, id, autoSavePhase]);
+
+  // Flush pending autosave on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveRef.current) {
+        clearTimeout(autoSaveRef.current);
+        // Fire immediate save
+        const phaseKey = moments[currentMoment]?.key;
+        const answersMap: Record<string, ChecklistQuestion[]> = {
+          'sign-in': signInAnswers,
+          'time-out': timeOutAnswers,
+          'sign-out': signOutAnswers,
+        };
+        if (phaseKey && answersMap[phaseKey]) {
+          autoSavePhase(phaseKey, answersMap[phaseKey]);
+        }
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (isLoading) {
     return <Layout><div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></Layout>;
@@ -319,44 +388,35 @@ export default function Checklist() {
     ));
   };
 
+  /** Save (complete) a phase — idempotent: reuses existing phase row */
   const savePhase = async (phase: string, questions: ChecklistQuestion[]) => {
-    // Create phase record
-    const { data: phaseRow, error: phaseErr } = await supabase.from('checklist_phases').insert({
-      surgery_id: id!,
-      phase,
-      completed_at: new Date().toISOString(),
-      completed_by: user?.id,
-    }).select('id').single();
-    if (phaseErr || !phaseRow) throw phaseErr;
+    // Cancel any pending autosave to avoid race conditions
+    if (autoSaveRef.current) {
+      clearTimeout(autoSaveRef.current);
+      autoSaveRef.current = null;
+    }
 
-    // Save answers
-    if (questions.length > 0) {
-      const answers = questions.flatMap((q) => {
-        const rows = [{
-          phase_id: phaseRow.id,
-          question_id: q.id,
-          question_text: q.text,
-          answer: q.answer || null,
-          answered_by: q.answeredBy || null,
-          answered_at: q.answeredAt ? new Date().toISOString() : null,
-        }];
-        const trigger = q.followUpOnYes ? 'si' : 'no';
-        if (q.followUpText && q.answer === trigger) {
-          rows.push({
-            phase_id: phaseRow.id,
-            question_id: q.id + '-followup',
-            question_text: q.followUpText,
-            answer: q.followUpAnswer || null,
-            answered_by: q.answeredBy || null,
-            answered_at: q.answeredAt ? new Date().toISOString() : null,
-          });
-        }
-        return rows;
-      });
-      const { error: ansErr } = await supabase.from('checklist_answers').insert(answers);
+    const phaseId = await getOrCreatePhaseId(phase);
+    if (!phaseId) throw new Error('Could not create phase');
+
+    // Mark phase as completed
+    await supabase.from('checklist_phases')
+      .update({ completed_at: new Date().toISOString(), completed_by: user?.id })
+      .eq('id', phaseId);
+
+    // Replace answers
+    await supabase.from('checklist_answers').delete().eq('phase_id', phaseId);
+    const rows = buildAnswerRows(phaseId, questions);
+    if (rows.length > 0) {
+      const { error: ansErr } = await supabase.from('checklist_answers').insert(rows);
       if (ansErr) throw ansErr;
     }
-    return phaseRow.id;
+
+    // Invalidate queries so re-entry gets fresh data
+    queryClient.invalidateQueries({ queryKey: ['checklist-phases', id] });
+    queryClient.invalidateQueries({ queryKey: ['checklist-answers', id] });
+
+    return phaseId;
   };
 
   const handleNext = async () => {
@@ -367,20 +427,20 @@ export default function Checklist() {
 
     setSaving(true);
     try {
-      const phaseKey = moments[currentMoment].key;
       const nextStatus = moments[currentMoment + 1]?.key || 'completada';
 
       if (currentMoment === 0) {
         await savePhase('sign-in', signInAnswers);
       } else if (currentMoment === 1) {
         await savePhase('time-out', timeOutAnswers);
-        // Save instruments
-        const instRows = usedInstruments.map((inst) => ({
-          surgery_id: id!,
-          name: inst.name,
-          initial_count: inst.initialCount,
-        }));
-        await supabase.from('instruments').insert(instRows);
+        // Save instruments using upsert (unique constraint: surgery_id + name)
+        for (const inst of usedInstruments) {
+          await supabase.from('instruments').upsert(
+            { surgery_id: id!, name: inst.name, initial_count: inst.initialCount },
+            { onConflict: 'surgery_id,name' }
+          );
+        }
+        queryClient.invalidateQueries({ queryKey: ['checklist-instruments', id] });
       } else if (currentMoment === 2) {
         await savePhase('sign-out', signOutAnswers);
         // Update final counts
@@ -484,3 +544,4 @@ export default function Checklist() {
     </Layout>
   );
 }
+

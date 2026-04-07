@@ -85,7 +85,13 @@ export default function SurgeryDetail() {
   const { data: phases = [] } = useQuery({
     queryKey: ['phases', id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('checklist_phases').select('*').eq('surgery_id', id!).order('created_at');
+      // Unique constraint ensures one row per (surgery_id, phase)
+      const { data, error } = await supabase
+        .from('checklist_phases')
+        .select('*')
+        .eq('surgery_id', id!)
+        .not('completed_at', 'is', null)
+        .order('created_at');
       if (error) throw error;
       return data;
     },

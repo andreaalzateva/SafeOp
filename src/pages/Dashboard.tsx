@@ -55,16 +55,19 @@ export default function Dashboard() {
   );
 
   // Count surgeries with truly invalid "no" answers (alerts) for coordinator dashboard
+  // Uses only the canonical phase row per surgery (unique constraint ensures one per phase)
   const { data: alertCount = 0 } = useQuery({
     queryKey: ['surgery-alerts', user?.clinicId],
     queryFn: async () => {
       const surgeryIds = surgeries.map(s => s.id);
       if (surgeryIds.length === 0) return 0;
 
+      // Only completed phases count for alerts
       const { data: phases } = await supabase
         .from('checklist_phases')
         .select('id, surgery_id')
-        .in('surgery_id', surgeryIds);
+        .in('surgery_id', surgeryIds)
+        .not('completed_at', 'is', null);
       if (!phases || phases.length === 0) return 0;
 
       const { data: answers } = await supabase
@@ -236,5 +239,6 @@ export default function Dashboard() {
     </Layout>
   );
 }
+
 
 
