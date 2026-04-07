@@ -59,6 +59,7 @@ Para facilitar la evaluación del sistema, se incluyen los siguientes usuarios:
 | Consulta | mafe@safeop.com | mafemafe |
 | Consulta | andrea@safeop.com | andrea |
 
+### NOTA: No todos los usuarios pertenecen a la misma clinica 
 ---
 
 ## 🧠 Enfoque del proyecto
