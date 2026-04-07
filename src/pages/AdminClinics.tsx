@@ -163,87 +163,97 @@ export default function AdminClinics() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border bg-card">
-          <div className="grid grid-cols-[1fr_auto_1fr_auto_auto_auto] gap-4 border-b bg-muted/50 px-5 py-3 text-xs font-medium text-muted-foreground">
-            <span>Nombre</span>
-            <span>NIT</span>
-            <span>Dirección</span>
-            <span>Quirófanos</span>
-            <span>Fecha</span>
-            <span>Acciones</span>
-          </div>
-          {clinics.length === 0 ? (
-            <div className="px-5 py-8 text-center text-muted-foreground">No hay clínicas registradas.</div>
-          ) : clinics.map((c, i) => (
-            <motion.div key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }} className="border-b last:border-0">
-              {editingId === c.id ? (
-                <div className="px-5 py-4 space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div>
-                      <Label className="text-xs">Nombre</Label>
-                      <Input className="mt-1" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label className="text-xs">NIT</Label>
-                      <Input className="mt-1" value={editForm.nit} onChange={e => setEditForm({ ...editForm, nit: e.target.value })} />
-                    </div>
-                     <div>
-                      <Label className="text-xs">Dirección</Label>
-                      <Input className="mt-1" value={editForm.address} onChange={e => setEditForm({ ...editForm, address: e.target.value })} />
-                    </div>
-                     <div>
-                      <Label className="text-xs">Quirófanos</Label>
-                      <Input className="mt-1" type="number" min="1" max="50" value={editForm.num_operating_rooms} onChange={e => setEditForm({ ...editForm, num_operating_rooms: e.target.value })} />
-                    </div>
-                   </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleUpdate} disabled={savingEdit} className="gap-1.5">
-                      {savingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Guardar
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditingId(null)} className="gap-1.5">
-                      <X className="h-3.5 w-3.5" /> Cancelar
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-[1fr_auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-4">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                      <Building2 className="h-4 w-4 text-primary" />
-                    </div>
-                    <span className="text-sm font-medium text-foreground">{c.name}</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">{c.nit}</span>
-                  <span className="text-sm text-muted-foreground">{c.address}</span>
-                  <span className="text-sm text-muted-foreground text-center">{(c as any).num_operating_rooms || 4}</span>
-                  <span className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString('es-ES')}</span>
-                  <div className="flex gap-1.5">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(c)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                          <Trash2 className="h-3.5 w-3.5" />
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-muted/50 text-xs font-medium text-muted-foreground">
+                <th className="px-4 py-3 text-left font-medium border-r border-border">Nombre</th>
+                <th className="px-4 py-3 text-left font-medium border-r border-border">NIT</th>
+                <th className="px-4 py-3 text-left font-medium border-r border-border">Dirección</th>
+                <th className="px-4 py-3 text-left font-medium border-r border-border">Quirófanos</th>
+                <th className="px-4 py-3 text-left font-medium border-r border-border">Fecha</th>
+                <th className="px-4 py-3 text-left font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clinics.length === 0 ? (
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">No hay clínicas registradas.</td></tr>
+              ) : clinics.map((c, i) => (
+                editingId === c.id ? (
+                  <tr key={c.id}><td colSpan={6} className="px-5 py-4">
+                    <div className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div>
+                          <Label className="text-xs">Nombre</Label>
+                          <Input className="mt-1" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label className="text-xs">NIT</Label>
+                          <Input className="mt-1" value={editForm.nit} onChange={e => setEditForm({ ...editForm, nit: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Dirección</Label>
+                          <Input className="mt-1" value={editForm.address} onChange={e => setEditForm({ ...editForm, address: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Quirófanos</Label>
+                          <Input className="mt-1" type="number" min="1" max="50" value={editForm.num_operating_rooms} onChange={e => setEditForm({ ...editForm, num_operating_rooms: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleUpdate} disabled={savingEdit} className="gap-1.5">
+                          {savingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Guardar
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>¿Eliminar "{c.name}"?</AlertDialogTitle>
-                          <AlertDialogDescription>Se eliminarán todos los datos asociados a esta clínica.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(c.id)} disabled={deletingId === c.id}>
-                            {deletingId === c.id ? 'Eliminando...' : 'Eliminar'}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          ))}
+                        <Button size="sm" variant="outline" onClick={() => setEditingId(null)} className="gap-1.5">
+                          <X className="h-3.5 w-3.5" /> Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  </td></tr>
+                ) : (
+                  <motion.tr key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }} className="border-t border-border">
+                    <td className="px-4 py-4 border-r border-border">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                          <Building2 className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-sm font-medium text-foreground">{c.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-muted-foreground border-r border-border">{c.nit}</td>
+                    <td className="px-4 py-4 text-sm text-muted-foreground border-r border-border">{c.address}</td>
+                    <td className="px-4 py-4 text-sm text-muted-foreground text-center border-r border-border">{c.num_operating_rooms || 4}</td>
+                    <td className="px-4 py-4 text-xs text-muted-foreground border-r border-border">{new Date(c.created_at).toLocaleDateString('es-ES')}</td>
+                    <td className="px-4 py-4">
+                      <div className="flex gap-1.5">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(c)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Eliminar "{c.name}"?</AlertDialogTitle>
+                              <AlertDialogDescription>Se eliminarán todos los datos asociados a esta clínica.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(c.id)} disabled={deletingId === c.id}>
+                                {deletingId === c.id ? 'Eliminando...' : 'Eliminar'}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </td>
+                  </motion.tr>
+                )
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </Layout>

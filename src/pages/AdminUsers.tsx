@@ -275,126 +275,138 @@ export default function AdminUsers() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border bg-card">
-          <div className={`grid gap-4 border-b bg-muted/50 px-5 py-3 text-xs font-medium text-muted-foreground ${user?.isSuperAdmin ? 'grid-cols-[1fr_1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_1fr_auto_auto_auto]'}`}>
-            <span>Nombre</span>
-            <span>Correo</span>
-            <span>Rol</span>
-            {user?.isSuperAdmin && <span>Clínica</span>}
-            <span>Fecha</span>
-            <span>Acciones</span>
-          </div>
-          {users.length === 0 ? (
-            <div className="px-5 py-8 text-center text-muted-foreground">No hay usuarios registrados.</div>
-          ) : users.map((u, i) => (
-            <motion.div key={u.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }} className="border-b last:border-0">
-              {editingId === u.id ? (
-                <div className="px-5 py-4 space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <Label className="text-xs">Nombre</Label>
-                      <Input className="mt-1" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Rol</Label>
-                      <Select value={editForm.role} onValueChange={v => setEditForm({ ...editForm, role: v, specialty: '' })}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {availableRoles.map(r => (
-                            <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {editForm.role === 'consulta' && (
-                      <div>
-                        <Label className="text-xs">Especialidad</Label>
-                        <Select value={editForm.specialty} onValueChange={v => setEditForm({ ...editForm, specialty: v })}>
-                          <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cirujano">Cirujano</SelectItem>
-                            <SelectItem value="anestesiologo">Anestesiólogo</SelectItem>
-                            <SelectItem value="otro">Otro</SelectItem>
-                          </SelectContent>
-                        </Select>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-muted/50 text-xs font-medium text-muted-foreground">
+                <th className="px-4 py-3 text-left font-medium border-r border-border">Nombre</th>
+                <th className="px-4 py-3 text-left font-medium border-r border-border">Correo</th>
+                <th className="px-4 py-3 text-left font-medium border-r border-border">Rol</th>
+                {user?.isSuperAdmin && <th className="px-4 py-3 text-left font-medium border-r border-border">Clínica</th>}
+                <th className="px-4 py-3 text-left font-medium border-r border-border">Fecha</th>
+                <th className="px-4 py-3 text-left font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.length === 0 ? (
+                <tr><td colSpan={user?.isSuperAdmin ? 6 : 5} className="px-5 py-8 text-center text-muted-foreground">No hay usuarios registrados.</td></tr>
+              ) : users.map((u, i) => (
+                editingId === u.id ? (
+                  <tr key={u.id}><td colSpan={user?.isSuperAdmin ? 6 : 5} className="px-5 py-4">
+                    <div className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <Label className="text-xs">Nombre</Label>
+                          <Input className="mt-1" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Rol</Label>
+                          <Select value={editForm.role} onValueChange={v => setEditForm({ ...editForm, role: v, specialty: '' })}>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {availableRoles.map(r => (
+                                <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {editForm.role === 'consulta' && (
+                          <div>
+                            <Label className="text-xs">Especialidad</Label>
+                            <Select value={editForm.specialty} onValueChange={v => setEditForm({ ...editForm, specialty: v })}>
+                              <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="cirujano">Cirujano</SelectItem>
+                                <SelectItem value="anestesiologo">Anestesiólogo</SelectItem>
+                                <SelectItem value="otro">Otro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {user?.isSuperAdmin && (
+                          <div>
+                            <Label className="text-xs">Clínica</Label>
+                            <Select value={editForm.clinicId} onValueChange={v => setEditForm({ ...editForm, clinicId: v })}>
+                              <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar clínica" /></SelectTrigger>
+                              <SelectContent>
+                                {clinics.map(c => (
+                                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </div>
-                    )}
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleUpdate} disabled={savingEdit} className="gap-1.5">
+                          {savingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Guardar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingId(null)} className="gap-1.5">
+                          <X className="h-3.5 w-3.5" /> Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  </td></tr>
+                ) : (
+                  <motion.tr key={u.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }} className="border-t border-border">
+                    <td className="px-4 py-4 border-r border-border">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                          <User className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-sm font-medium text-foreground">{u.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-muted-foreground border-r border-border">{u.email}</td>
+                    <td className="px-4 py-4 border-r border-border">
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
+                          u.role === 'supervisor' ? 'bg-destructive/10 text-destructive' : u.role === 'coordinador' ? 'bg-primary/10 text-primary' : u.role === 'encargado' ? 'bg-warning/10 text-warning' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        }`}>
+                          <Shield className="h-3 w-3" />
+                          {roleLabels[u.role] || u.role}
+                        </span>
+                        {u.role === 'consulta' && u.specialty && (
+                          <span className="text-xs text-muted-foreground capitalize ml-1">{u.specialty === 'anestesiologo' ? 'Anestesiólogo' : u.specialty === 'cirujano' ? 'Cirujano' : 'Otro'}</span>
+                        )}
+                      </div>
+                    </td>
                     {user?.isSuperAdmin && (
-                      <div>
-                        <Label className="text-xs">Clínica</Label>
-                        <Select value={editForm.clinicId} onValueChange={v => setEditForm({ ...editForm, clinicId: v })}>
-                          <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar clínica" /></SelectTrigger>
-                          <SelectContent>
-                            {clinics.map(c => (
-                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <td className="px-4 py-4 text-xs text-muted-foreground border-r border-border">{(u as any).clinicName || '—'}</td>
+                    )}
+                    <td className="px-4 py-4 text-xs text-muted-foreground border-r border-border">{new Date(u.created_at).toLocaleDateString('es-ES')}</td>
+                    <td className="px-4 py-4">
+                      <div className="flex gap-1.5">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(u)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        {u.id !== user?.id && !(u as any).is_super_admin && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>¿Eliminar a {u.name}?</AlertDialogTitle>
+                                <AlertDialogDescription>Esta acción eliminará permanentemente al usuario.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(u.id)} disabled={deletingId === u.id}>
+                                  {deletingId === u.id ? 'Eliminando...' : 'Eliminar'}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleUpdate} disabled={savingEdit} className="gap-1.5">
-                      {savingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Guardar
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditingId(null)} className="gap-1.5">
-                      <X className="h-3.5 w-3.5" /> Cancelar
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className={`grid items-center gap-4 px-5 py-4 ${user?.isSuperAdmin ? 'grid-cols-[1fr_1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_1fr_auto_auto_auto]'}`}>
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                      <User className="h-4 w-4 text-primary" />
-                    </div>
-                    <span className="text-sm font-medium text-foreground">{u.name}</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">{u.email}</span>
-                  <div className="flex flex-col items-start gap-0.5">
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
-                      u.role === 'supervisor' ? 'bg-destructive/10 text-destructive' : u.role === 'coordinador' ? 'bg-primary/10 text-primary' : u.role === 'encargado' ? 'bg-warning/10 text-warning' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-                    }`}>
-                      <Shield className="h-3 w-3" />
-                      {roleLabels[u.role] || u.role}
-                    </span>
-                    {u.role === 'consulta' && u.specialty && (
-                      <span className="text-xs text-muted-foreground capitalize ml-1">{u.specialty === 'anestesiologo' ? 'Anestesiólogo' : u.specialty === 'cirujano' ? 'Cirujano' : 'Otro'}</span>
-                    )}
-                  </div>
-                  {user?.isSuperAdmin && (
-                    <span className="text-xs text-muted-foreground">{(u as any).clinicName || '—'}</span>
-                  )}
-                  <span className="text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString('es-ES')}</span>
-                  <div className="flex gap-1.5">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(u)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    {u.id !== user?.id && !(u as any).is_super_admin && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Eliminar a {u.name}?</AlertDialogTitle>
-                            <AlertDialogDescription>Esta acción eliminará permanentemente al usuario.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(u.id)} disabled={deletingId === u.id}>
-                              {deletingId === u.id ? 'Eliminando...' : 'Eliminar'}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          ))}
+                    </td>
+                  </motion.tr>
+                )
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </Layout>
