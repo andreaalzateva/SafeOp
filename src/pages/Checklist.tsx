@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/authContext';
 import { useQuery } from '@tanstack/react-query';
@@ -24,9 +24,10 @@ const moments = [
 
 const statusToMoment: Record<string, number> = {
   'programada': 0,
-  'sign-in': 1,
-  'time-out': 2,
-  'sign-out': 3,
+  'sign-in': 0,
+  'time-out': 1,
+  'sign-out': 2,
+  'signature': 3,
 };
 
 export default function Checklist() {
@@ -43,9 +44,43 @@ export default function Checklist() {
     },
   });
 
+  // Load existing phases and answers for this surgery
+  const { data: existingPhases = [], isFetched: phasesFetched } = useQuery({
+    queryKey: ['checklist-phases', id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('checklist_phases').select('*').eq('surgery_id', id!);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  const { data: existingAnswers = [], isFetched: answersFetched } = useQuery({
+    queryKey: ['checklist-answers', id],
+    queryFn: async () => {
+      const phaseIds = existingPhases.map(p => p.id);
+      if (phaseIds.length === 0) return [];
+      const { data, error } = await supabase.from('checklist_answers').select('*').in('phase_id', phaseIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: existingPhases.length > 0,
+  });
+
+  const { data: existingInstruments = [] } = useQuery({
+    queryKey: ['checklist-instruments', id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('instruments').select('*').eq('surgery_id', id!);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   const [currentMoment, setCurrentMoment] = useState(0);
   const [completed, setCompleted] = useState([false, false, false, false]);
   const [startTime] = useState(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }));
+  const [restored, setRestored] = useState(false);
 
   const [signInAnswers, setSignInAnswers] = useState<ChecklistQuestion[]>(
     signInQuestions.map((q) => ({ ...q, answer: null }))
@@ -62,15 +97,159 @@ export default function Checklist() {
   const [finalInstruments, setFinalInstruments] = useState<InstrumentCount[]>([]);
   const [saving, setSaving] = useState(false);
 
+  // Mark surgery as in-progress on entry
   useEffect(() => {
-    if (surgery) {
-      const momentIdx = statusToMoment[surgery.status] ?? 0;
-      setCurrentMoment(momentIdx);
-      const comp = [false, false, false, false];
-      for (let i = 0; i < momentIdx; i++) comp[i] = true;
-      setCompleted(comp);
+    if (!surgery || surgery.status !== 'programada') return;
+    const updateStatus = async () => {
+      const { error } = await supabase
+        .from('surgeries')
+        .update({ status: 'sign-in' })
+        .eq('id', id!);
+      if (error) console.error('Error updating surgery status:', error);
+    };
+    updateStatus();
+  }, [surgery, id]);
+
+  // Restore saved progress
+  useEffect(() => {
+    if (!surgery || restored || !phasesFetched) return;
+    if (existingPhases.length > 0 && !answersFetched) return;
+
+    const momentIdx = statusToMoment[surgery.status] ?? 0;
+    setCurrentMoment(momentIdx);
+    const comp = [false, false, false, false];
+    for (let i = 0; i < momentIdx; i++) comp[i] = true;
+    setCompleted(comp);
+
+    // Restore saved answers into the current phase's state
+    if (existingAnswers.length > 0) {
+      const restoreAnswers = (
+        questions: ChecklistQuestion[],
+        phaseName: string
+      ): ChecklistQuestion[] => {
+        const phase = existingPhases.find(p => p.phase === phaseName);
+        if (!phase) return questions;
+        const phaseAnswers = existingAnswers.filter(a => a.phase_id === phase.id);
+        return questions.map(q => {
+          const saved = phaseAnswers.find(a => a.question_id === q.id);
+          const savedFollowUp = phaseAnswers.find(a => a.question_id === q.id + '-followup');
+          if (!saved) return q;
+          return {
+            ...q,
+            answer: (saved.answer as 'si' | 'no') || null,
+            answeredBy: saved.answered_by || undefined,
+            answeredAt: saved.answered_at ? new Date(saved.answered_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : undefined,
+            followUpAnswer: savedFollowUp ? (savedFollowUp.answer as 'si' | 'no') || null : q.followUpAnswer,
+          };
+        });
+      };
+
+      if (existingPhases.some(p => p.phase === 'sign-in')) {
+        setSignInAnswers(prev => restoreAnswers(prev, 'sign-in'));
+      }
+      if (existingPhases.some(p => p.phase === 'time-out')) {
+        setTimeOutAnswers(prev => restoreAnswers(prev, 'time-out'));
+      }
+      if (existingPhases.some(p => p.phase === 'sign-out')) {
+        setSignOutAnswers(prev => restoreAnswers(prev, 'sign-out'));
+      }
     }
-  }, [surgery]);
+
+    // Restore instruments
+    if (existingInstruments.length > 0) {
+      setInstruments(prev => {
+        const restored = prev.map(inst => {
+          const saved = existingInstruments.find(ei => ei.name === inst.name);
+          if (saved) return { ...inst, initialCount: saved.initial_count };
+          return inst;
+        });
+        const extraInstruments = existingInstruments
+          .filter(ei => !prev.some(p => p.name === ei.name))
+          .map((ei, idx) => ({ id: `extra-${idx}`, name: ei.name, initialCount: ei.initial_count }));
+        return [...restored, ...extraInstruments];
+      });
+
+      if (momentIdx >= 2) {
+        const usedInsts = existingInstruments.filter(ei => ei.initial_count > 0);
+        setFinalInstruments(usedInsts.map((ei, idx) => ({
+          id: `inst-final-${idx}`,
+          name: ei.name,
+          initialCount: ei.initial_count,
+          finalCount: ei.final_count ?? undefined,
+        })));
+      }
+    }
+
+    setRestored(true);
+  }, [surgery, existingPhases, existingAnswers, existingInstruments, restored, phasesFetched, answersFetched]);
+
+  // Auto-save partial answers for the current phase
+  const autoSaveRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSavePhase = useCallback(async (phase: string, questions: ChecklistQuestion[]) => {
+    const answeredQuestions = questions.filter(q => q.answer !== null);
+    if (answeredQuestions.length === 0) return;
+
+    // Upsert: delete existing partial phase, then re-insert
+    const existingPhase = existingPhases.find(p => p.phase === phase);
+    let phaseId: string;
+    if (existingPhase) {
+      phaseId = existingPhase.id;
+      // Delete old answers for this phase
+      await supabase.from('checklist_answers').delete().eq('phase_id', phaseId);
+    } else {
+      const { data: phaseRow, error } = await supabase.from('checklist_phases').insert({
+        surgery_id: id!,
+        phase,
+        completed_by: user?.id,
+      }).select('id').single();
+      if (error || !phaseRow) return;
+      phaseId = phaseRow.id;
+    }
+
+    const answers = answeredQuestions.flatMap((q) => {
+      const rows = [{
+        phase_id: phaseId,
+        question_id: q.id,
+        question_text: q.text,
+        answer: q.answer || null,
+        answered_by: q.answeredBy || null,
+        answered_at: q.answeredAt ? new Date().toISOString() : null,
+      }];
+      const trigger = q.followUpOnYes ? 'si' : 'no';
+      if (q.followUpText && q.answer === trigger && q.followUpAnswer) {
+        rows.push({
+          phase_id: phaseId,
+          question_id: q.id + '-followup',
+          question_text: q.followUpText,
+          answer: q.followUpAnswer || null,
+          answered_by: q.answeredBy || null,
+          answered_at: q.answeredAt ? new Date().toISOString() : null,
+        });
+      }
+      return rows;
+    });
+    if (answers.length > 0) {
+      await supabase.from('checklist_answers').insert(answers);
+    }
+  }, [id, user, existingPhases]);
+
+  // Debounced auto-save when answers change
+  useEffect(() => {
+    if (!restored || !id) return;
+    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+    autoSaveRef.current = setTimeout(() => {
+      const phaseKey = moments[currentMoment].key;
+      const answersMap: Record<string, ChecklistQuestion[]> = {
+        'sign-in': signInAnswers,
+        'time-out': timeOutAnswers,
+        'sign-out': signOutAnswers,
+      };
+      if (answersMap[phaseKey]) {
+        autoSavePhase(phaseKey, answersMap[phaseKey]);
+      }
+    }, 2000);
+    return () => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); };
+  }, [signInAnswers, timeOutAnswers, signOutAnswers, currentMoment, restored, id, autoSavePhase]);
 
   if (isLoading) {
     return <Layout><div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></Layout>;

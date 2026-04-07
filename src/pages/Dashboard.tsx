@@ -9,25 +9,19 @@ import { Calendar, Clock, MapPin, User, ArrowRight, AlertTriangle, CheckCircle2,
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { statusConfig, getStatusConfig } from '@/lib/surgeryStatus';
 
 function formatFullDate(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
   return d.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  programada: { label: 'Programada', color: 'bg-secondary text-secondary-foreground' },
-  'sign-in': { label: 'Sign In', color: 'bg-primary/10 text-primary' },
-  'time-out': { label: 'Time Out', color: 'bg-warning/10 text-warning' },
-  'sign-out': { label: 'Sign Out', color: 'bg-accent/10 text-accent' },
-  completada: { label: 'Completada', color: 'bg-success/10 text-success' },
-};
-
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const isCoordinator = user?.role === 'coordinador';
 
   const { data: surgeries = [], isLoading } = useQuery({
     queryKey: ['surgeries', user?.clinicId],
@@ -42,17 +36,52 @@ export default function Dashboard() {
       if (error) throw error;
       return data;
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
-  const isCoordinator = user?.role === 'coordinador';
+  // Count surgeries with "no" answers (alerts) for coordinator dashboard
+  const { data: alertCount = 0 } = useQuery({
+    queryKey: ['surgery-alerts', user?.clinicId],
+    queryFn: async () => {
+      // Get surgery IDs for this clinic
+      const surgeryIds = surgeries.map(s => s.id);
+      if (surgeryIds.length === 0) return 0;
+
+      // Get phases for these surgeries
+      const { data: phases, error: pErr } = await supabase
+        .from('checklist_phases')
+        .select('id, surgery_id')
+        .in('surgery_id', surgeryIds);
+      if (pErr || !phases || phases.length === 0) return 0;
+
+      // Get answers with "no" for these phases
+      const { data: noAnswers, error: aErr } = await supabase
+        .from('checklist_answers')
+        .select('phase_id')
+        .in('phase_id', phases.map(p => p.id))
+        .eq('answer', 'no');
+      if (aErr || !noAnswers) return 0;
+
+      // Count unique surgeries with at least one "no"
+      const phaseToSurgery = new Map(phases.map(p => [p.id, p.surgery_id]));
+      const surgeriesWithAlerts = new Set(noAnswers.map(a => phaseToSurgery.get(a.phase_id)));
+      return surgeriesWithAlerts.size;
+    },
+    enabled: isCoordinator && surgeries.length > 0,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  });
+
+  const today = new Date().toISOString().split('T')[0];
   const isConsulta = user?.role === 'consulta';
 
   const stats = isCoordinator
     ? [
-        { label: 'Cirugías Hoy', value: surgeries.length, icon: Calendar, color: 'text-primary' },
+        { label: 'Cirugías Hoy', value: surgeries.filter((s) => s.date === today).length, icon: Calendar, color: 'text-primary' },
         { label: 'En Curso', value: surgeries.filter((s) => !['programada', 'completada'].includes(s.status)).length, icon: Activity, color: 'text-warning' },
-        { label: 'Completadas', value: surgeries.filter((s) => s.status === 'completada').length, icon: CheckCircle2, color: 'text-success' },
-        { label: 'Alertas', value: 0, icon: AlertTriangle, color: 'text-destructive' },
+        { label: 'Completadas', value: surgeries.filter((s) => s.status === 'completada' && s.date === today).length, icon: CheckCircle2, color: 'text-success' },
+        { label: 'Alertas', value: alertCount, icon: AlertTriangle, color: 'text-destructive' },
       ]
     : null;
 
@@ -143,8 +172,8 @@ export default function Dashboard() {
       ) : (
         <div className="space-y-3">
           {filtered.map((surgery, i) => {
-            const status = statusConfig[surgery.status] || statusConfig.programada;
-            const canStartChecklist = user?.role === 'encargado' && surgery.status !== 'completada';
+            const status = getStatusConfig(surgery.status);
+            const canStartChecklist = user?.role === 'encargado' && surgery.status !== 'completada' && surgery.date === today;
 
             return (
               <motion.div key={surgery.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="rounded-xl border bg-card p-5 transition-shadow hover:shadow-md">

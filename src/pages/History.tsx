@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/authContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle2, Clock, Loader2, Search, Filter } from 'lucide-react';
+import { getStatusConfig } from '@/lib/surgeryStatus';
 import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -85,36 +86,41 @@ export default function History() {
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-card">
-        <div className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto] gap-4 border-b bg-muted/50 px-5 py-3 text-xs font-medium text-muted-foreground">
-          <span>Paciente</span>
-          <span>Procedimiento</span>
-          <span>Sala</span>
-          <span>Fecha</span>
-          <span>Hora</span>
-          <span>Estado</span>
-        </div>
-        {filtered.length === 0 ? (
-          <div className="px-5 py-8 text-center text-muted-foreground">
-            {searchTerm || statusFilter !== 'all' ? 'No se encontraron resultados con los filtros aplicados.' : 'No hay cirugías registradas.'}
-          </div>
-        ) : filtered.map((s, i) => (
-          <motion.div key={s.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }} className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto] items-center gap-4 border-b px-5 py-4 last:border-0">
-            <div>
-              <p className="text-sm font-medium text-foreground">{s.patient}</p>
-              <p className="text-xs text-muted-foreground">{s.surgeon}</p>
-            </div>
-            <p className="text-sm text-muted-foreground">{s.procedure_name}</p>
-            <span className="text-sm text-muted-foreground">{s.room}</span>
-            <span className="text-sm text-muted-foreground whitespace-nowrap">{formatFullDate(s.date)}</span>
-            <span className="text-sm text-muted-foreground">{s.time}</span>
-            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
-              s.status === 'completada' ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'
-            }`}>
-              {s.status === 'completada' ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-              {s.status === 'completada' ? 'Completada' : s.status === 'programada' ? 'Programada' : s.status}
-            </span>
-          </motion.div>
-        ))}
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-muted/50 text-xs font-medium text-muted-foreground">
+              <th className="px-4 py-3 text-left font-medium border-r border-border">Paciente</th>
+              <th className="px-4 py-3 text-left font-medium border-r border-border">Procedimiento</th>
+              <th className="px-4 py-3 text-left font-medium border-r border-border">Sala</th>
+              <th className="px-4 py-3 text-left font-medium border-r border-border">Fecha</th>
+              <th className="px-4 py-3 text-left font-medium border-r border-border">Hora</th>
+              <th className="px-4 py-3 text-left font-medium">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">
+                {searchTerm || statusFilter !== 'all' ? 'No se encontraron resultados con los filtros aplicados.' : 'No hay cirugías registradas.'}
+              </td></tr>
+            ) : filtered.map((s, i) => (
+              <motion.tr key={s.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }} className="border-t border-border">
+                <td className="px-4 py-4 border-r border-border">
+                  <p className="text-sm font-medium text-foreground">{s.patient}</p>
+                  <p className="text-xs text-muted-foreground">{s.surgeon}</p>
+                </td>
+                <td className="px-4 py-4 text-sm text-muted-foreground border-r border-border">{s.procedure_name}</td>
+                <td className="px-4 py-4 text-sm text-muted-foreground border-r border-border">{s.room}</td>
+                <td className="px-4 py-4 text-sm text-muted-foreground whitespace-nowrap border-r border-border">{formatFullDate(s.date)}</td>
+                <td className="px-4 py-4 text-sm text-muted-foreground border-r border-border">{s.time}</td>
+                <td className="px-4 py-4">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${getStatusConfig(s.status).color}`}>
+                    {getStatusConfig(s.status).label}
+                  </span>
+                </td>
+              </motion.tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </Layout>
   );
