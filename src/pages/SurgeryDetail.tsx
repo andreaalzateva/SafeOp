@@ -90,7 +90,6 @@ export default function SurgeryDetail() {
         .from('checklist_phases')
         .select('*')
         .eq('surgery_id', id!)
-        .not('completed_at', 'is', null)
         .order('created_at');
       if (error) throw error;
       return data;
@@ -462,4 +461,5 @@ function AnswerRow({ text, answer, answeredBy }: { text: string; answer?: 'si' |
     </div>
   );
 }
+
 

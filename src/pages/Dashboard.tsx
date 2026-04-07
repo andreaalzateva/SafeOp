@@ -62,12 +62,11 @@ export default function Dashboard() {
       const surgeryIds = surgeries.map(s => s.id);
       if (surgeryIds.length === 0) return 0;
 
-      // Only completed phases count for alerts
+      // All phases count for alerts (unique constraint prevents duplicates)
       const { data: phases } = await supabase
         .from('checklist_phases')
         .select('id, surgery_id')
-        .in('surgery_id', surgeryIds)
-        .not('completed_at', 'is', null);
+        .in('surgery_id', surgeryIds);
       if (!phases || phases.length === 0) return 0;
 
       const { data: answers } = await supabase
@@ -239,6 +238,3 @@ export default function Dashboard() {
     </Layout>
   );
 }
-
-
-
