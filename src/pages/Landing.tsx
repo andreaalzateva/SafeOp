@@ -180,7 +180,7 @@ export default function Landing() {
             Protege a tus pacientes y a tu equipo
           </h2>
           <p className="mt-4 text-primary-foreground/80">
-            Un instrumento olvidado genera demandas de $50,000 a $500,000 USD. SafeOp cuesta desde $50/mes.
+            Un instrumento olvidado genera demandas de $50,000 a $500,000 USD. SafeOp cuesta mucho menos que esto.
           </p>
           <Button
             size="lg"
